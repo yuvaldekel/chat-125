@@ -61,7 +61,6 @@ def main():
                 current_socket, data = message
                 
                 if current_socket in ready_wr:
-                    data = f"Hello {data}!"
                     print(f"Sending {current_socket.getpeername()}: {data}")
                     current_socket.send(data.encode())
                     socket_to_send.remove(message)
