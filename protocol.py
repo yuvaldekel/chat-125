@@ -3,9 +3,9 @@ import datetime
 NAME_LENGTH_FIELD_SIZE = 1
 LENGTH_FIELD_SIZE = 2
 SERVER_FIELD_SIZE = 2
+STATUS_SIZE = 3
 
-
-def create_client_msg(data, name, command = 1):
+def create_client_msg(data, name, command):
     naem_length = str(len(name))
     zfill_nzme_length = naem_length.zfill(NAME_LENGTH_FIELD_SIZE)
     
@@ -21,7 +21,7 @@ def get_client_msg(my_socket):
         
         name_length = my_socket.recv(NAME_LENGTH_FIELD_SIZE).decode()
         if name_length == '':
-            return False, {}
+            return False, {'closed': "client disconnected for some reasons"}
         name_length = int(name_length)
         
         name = my_socket.recv(name_length).decode()
@@ -32,7 +32,7 @@ def get_client_msg(my_socket):
 
         data_length = my_socket.recv(LENGTH_FIELD_SIZE).decode()
         if data_length == '':
-            return False, {}
+            return False, {'error': "Error receiving massage."}
         data_length = int(data_length)
 
         data = my_socket.recv(data_length).decode()
@@ -48,25 +48,30 @@ def get_client_msg(my_socket):
 
 def get_server_msg(my_socket):
     try:
+        status = int(my_socket.recv(STATUS_SIZE))
         data_length = my_socket.recv(SERVER_FIELD_SIZE).decode()
         if data_length == '':
-            return False, ''
+            return False, 500, ''
         data_length = int(data_length)
 
         data = my_socket.recv(data_length).decode()
-        return True, data
+        return True, status, data
 
     except ValueError:
-        return False, "Error receiving massage"
+        return False, 500, "Error receiving massage"
     
-def create_server_msg(message_params):
+def create_server_msg(message_params,style, status = 200):
     message = ''
-    if message_params["command"] == 1: 
+    if style == 0:
+        message = f"{message_params["time"]} name {message_params["name"]} {message_params["data"]}"
+    if style == 1: 
         message = f"{message_params["time"]} {message_params["name"]}: {message_params["data"]}"
+    if style == 2:
+        message = f"{message_params["time"]} {message_params["data"]}"
     message_len = str(len(message))
     message_len_fill = message_len.zfill(SERVER_FIELD_SIZE)
 
-    full_message = message_len_fill + message
+    full_message = str(status) + message_len_fill + message
     return full_message.encode()
 
 def main():
