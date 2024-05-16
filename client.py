@@ -1,6 +1,6 @@
 import datetime
-import KBHit_py
-import protocol
+import KBHit_py # type: ignore
+import protocol # type: ignore
 import select
 from socket import socket, AF_INET, SOCK_STREAM
 

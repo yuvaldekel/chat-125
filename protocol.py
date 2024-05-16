@@ -77,13 +77,13 @@ def get_server_msg(my_socket):
     except ValueError:
         return False, 500, "Error receiving massage"
     
-def create_server_msg(message_params,style, status = 200):
+def create_server_msg(message_params,format, status = 200):
     message = ''
-    if style == 0:
+    if format == 0:
         message = f"{message_params["time"]} name {message_params["name"]} {message_params["data"]}"
-    if style == 1: 
+    if format == 1: 
         message = f"{message_params["time"]} {message_params["name"]}: {message_params["data"]}"
-    if style == 2:
+    if format == 2:
         message = f"{message_params["time"]} {message_params["data"]}"
     message_len = str(len(message))
     message_len_fill = message_len.zfill(SERVER_FIELD_SIZE)
