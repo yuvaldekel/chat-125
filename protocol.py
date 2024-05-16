@@ -68,7 +68,7 @@ def get_server_msg(my_socket):
         status = int(my_socket.recv(STATUS_SIZE))
         data_length = my_socket.recv(SERVER_FIELD_SIZE).decode()
         if data_length == '':
-            return False, 500, ''
+            return False, 500, "Error receiving massage"
         data_length = int(data_length)
 
         data = my_socket.recv(data_length).decode()

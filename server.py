@@ -199,8 +199,7 @@ def private(current_socket,params):
 
 def closed(current_socket, params):
     print(f", {params["closed"]}")
-    try:
-            
+    try:  
         users = list(socket_username.keys())
         sockets = list(socket_username.values())
         closed_name = users[sockets.index(current_socket)]
@@ -208,6 +207,13 @@ def closed(current_socket, params):
         params["data"] = f"{closed_name} {params["closed"]}"
         message = protocol.create_server_msg(params, 2)
         messages_to_send.extend(add_message(client_sockets, current_socket, message))
+
+        if closed_name in managers and closed_name not in hard_coded_managers:
+            managers.remove(closed_name)
+        if current_socket in muted:
+            muted.remove(current_socket)
+        socket_username.pop(closed_name)
+
     except ValueError:
         pass
     finally:
