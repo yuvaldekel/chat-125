@@ -5,25 +5,39 @@ import select
 from socket import socket, AF_INET, SOCK_STREAM
 
 
-SERVER_PORT = 5555
+SERVER_PORT = 8881
 SERVER_IP = '127.0.1.1'
 
 def send_message(current_message, name):
     sending_time = datetime.datetime.now()
-    
+    receiver = None
+
     command =1
-    if current_message.startswith("kick"):
+    if current_message.startswith("kick "):
         print(f"{sending_time:%H:%M} Me {current_message}")
         current_message = current_message[5:]
         command = 3
-    if current_message.startswith("add"):
+    elif current_message.startswith("add "):
         print(f"{sending_time:%H:%M} Me {current_message}")
         current_message = current_message[4:]
         command = 2
+    elif current_message.startswith("mute "):
+        print(f"{sending_time:%H:%M} Me {current_message}")
+        current_message = current_message[5:]
+        command = 4
+    elif current_message.startswith("private "):
+        print(f"{sending_time:%H:%M} Me {current_message}")
+        words =  current_message.split(" ")
+        receiver = words[1]
+        words.pop(0)
+        words.pop(1)
+        current_message = ' '.join(words)
+        command = 5
+
     else:
         print(f"{sending_time:%H:%M} Me: {current_message}")
 
-    return protocol.create_client_msg(current_message, name, command)
+    return protocol.create_client_msg(current_message, name, command, receiver)
 
 def main():
     name = 'Me'
@@ -35,8 +49,6 @@ def main():
             kb = KBHit_py.KBHit()
             messages = []
             string = []
-
-            #name = input("Please enter what would like to send to the server ")
 
             while True:
                 exit = False
@@ -62,8 +74,8 @@ def main():
                 for current_message in messages:
                     if my_socket in ready_wr:
                         if current_message == "":
-                            messages.remove(current_message)
-                            continue
+                            exit = True
+                            break
 
                         my_socket.send(send_message(current_message, name))
 
