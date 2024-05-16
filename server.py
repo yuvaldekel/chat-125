@@ -3,13 +3,14 @@ import protocol
 import select
 from socket import socket, AF_INET, SOCK_STREAM
 
-SERVER_PORT = 5555
+SERVER_PORT = 8881
 SERVER_IP = '0.0.0.0'
 
 client_sockets = []
 messages_to_send = []
 muted = []
 socket_username = {}
+hard_coded_managers = ["yuval"]
 managers = ['yuval']
 
 def print_client_sockets(client_sockets):
@@ -49,7 +50,10 @@ def handle_message(current_socket, params):
         add_manager(current_socket,params)
     elif params["command"] == 3:
         kick(current_socket,params)
-
+    elif params["command"] == 4:
+        mute(current_socket,params)
+    elif params["command"] == 5:
+        private(current_socket,params)
 
 def name_exist(current_socket, params):
     print(", user used a name that already exist.")
@@ -65,18 +69,28 @@ def regular_messsage(current_socket, params):
         print(f", client {params["name"]} asked to quit.\nConnection was closed with {current_socket.getpeername()}")
         
         params["data"] = f"{params["name"]} has left the chat!"
-        message = protocol.create_server_msg(params, 3)
+        message = protocol.create_server_msg(params, 2)
         messages_to_send.extend(add_message(client_sockets, current_socket, message))
         
+        if current_socket in muted:
+            muted.remove(current_socket)
+
         client_sockets.remove(current_socket)
         if params['name'].startswith("@"):
             socket_username.pop(params['name'][1:])
+            if params['name'][1:] not in hard_coded_managers:
+                managers.remove(params['name'][1:])
         else:
             socket_username.pop(params['name'])
         current_socket.close()
-    
+    elif params['data'] == "view-managers":
+        params["data"] = f"{managers}"
+        message = protocol.create_server_msg(params, 2)
+        messages_to_send.append((current_socket, message))  
     elif current_socket in muted:
-        message = protocol.create_server_msg(params, 4, 403)
+        params["data"] = "You cannot speak here."
+        message = protocol.create_server_msg(params, 2, 402)
+        messages_to_send.append((current_socket, message))
     else:
         print(f", client {params['name']} sent: {params['data']}")
         message = protocol.create_server_msg(params, 1)
@@ -85,10 +99,11 @@ def regular_messsage(current_socket, params):
 def kick(current_socket,params):
     try:
         if params["name"] in managers:
-            kicked_socket = socket_username[params['data']]
-            socket_username.pop(params['data'])
+            to_kick = params['data']
+            kicked_socket = socket_username[to_kick]
+            socket_username.pop(to_kick)
 
-            params["data"] = f"{params["data"]} has been kicked out from the chat!"
+            params["data"] = f"{to_kick} has been kicked out from the chat!"
             message = protocol.create_server_msg(params, 2)
             messages_to_send.extend(add_message(client_sockets, kicked_socket, message))
             
@@ -96,27 +111,99 @@ def kick(current_socket,params):
             message = protocol.create_server_msg(params, 2, 401)
             messages_to_send.append((kicked_socket, message, True))
 
-            print(f", manager {params["name"]} kicked out {params["data"]}")
+            if to_kick in managers and to_kick not in hard_coded_managers:
+                managers.remove(to_kick)
+            if kicked_socket in muted:
+                muted.remove(kicked_socket)
+
+            print(f", manager {params["name"]} kicked out {to_kick}")
         else:
             params["data"] = f"You can't kick out other users, you are not a manager."
-            message = protocol.create_server_msg(params, 2, 404)
+            message = protocol.create_server_msg(params, 2, 403)
             messages_to_send.append((current_socket, message))
     except KeyError:
-        params["data"] = f"'{params["data"]}' can't be kicked out from the chat!"
-        message = protocol.create_server_msg(params, 2, 405)
+        params["data"] = f"'{params["data"]}' can't be kicked out from the chat!, he is not a member of this chat."
+        message = protocol.create_server_msg(params, 2, 404)
         messages_to_send.append((current_socket, message))
 
 def add_manager(current_socket, params):
+    to_manager = params['data']
     if params["name"] in managers:
-        managers.append(params["data"])
-        params["data"] = f"{params["data"]} is now manager"
+        if to_manager not in socket_username:
+            params["data"] = f"You can't make {to_manager} manager, he is not a member of this chat."
+            message = protocol.create_server_msg(params, 2, 404)
+            messages_to_send.append((current_socket, message))
+        elif to_manager in managers:
+            params["data"] = f"You can't make {to_manager} manger, he is already manager."
+            message = protocol.create_server_msg(params, 2, 405)
+            messages_to_send.append((current_socket, message))
+        else:
+            managers.append(to_manager)
+            params["data"] = f"{params["data"]} is now manager"
 
-        message = protocol.create_server_msg(params, 2)
-        messages_to_send.extend(add_message(client_sockets, current_socket, message))
+            message = protocol.create_server_msg(params, 2)
+            messages_to_send.extend(add_message(client_sockets, current_socket, message))
+            messages_to_send.append((current_socket, message))
+
     else:
         params["data"] = f"You can't add new manager, you are not a manager."
-        message = protocol.create_server_msg(params, 2, 404)
+        message = protocol.create_server_msg(params, 2, 403)
         messages_to_send.append((current_socket, message))
+
+
+def mute(current_socket, params):
+    to_mute = params['data']
+    if params["name"] in managers:
+        if to_mute not in socket_username:
+            params["data"] = f"You can't mute {to_mute}, he is not a member of this chat."
+            message = protocol.create_server_msg(params, 2, 404)
+            messages_to_send.append((current_socket, message))
+        elif socket_username[to_mute] in muted:
+            params["data"] = f"You can't mute {to_mute}, he is already muted."
+            message = protocol.create_server_msg(params, 2, 405)
+            messages_to_send.append((current_socket, message))
+        else:
+            muted.append(socket_username[to_mute])
+            params["data"] = f"You muted {to_mute}."
+            message = protocol.create_server_msg(params, 2)
+            messages_to_send.append((current_socket, message))
+    else:
+        params["data"] = f"You can't mute other members, you are not a manager."
+        message = protocol.create_server_msg(params, 2, 403)
+        messages_to_send.append((current_socket, message))
+    
+def private(current_socket,params):
+    receiver = params["receiver"]
+    if receiver in socket_username:
+        receiver_socket = socket_username[receiver]
+        print(f", client {params['name']} wanted to send a privte message {params['data']} to {receiver}")
+        message = protocol.create_server_msg(params, 1)
+        messages_to_send.append((receiver_socket, message))
+    else:
+        print(f", client {params['name']} sent: privte message {params['data']} to a client that does not exist")
+        params["data"] = f"{receiver} is not a member of this chat, you cannot send him a message."
+        message = protocol.create_server_msg(params, 2)
+        messages_to_send.append((current_socket, message))
+
+
+def closed(current_socket, params):
+    print(f", {params["closed"]}")
+    try:
+            
+        users = list(socket_username.keys())
+        sockets = list(socket_username.values())
+        closed_name = users[sockets.index(current_socket)]
+
+        params["data"] = f"{closed_name} {params["closed"]}"
+        message = protocol.create_server_msg(params, 2)
+        messages_to_send.extend(add_message(client_sockets, current_socket, message))
+    except ValueError:
+        pass
+    finally:
+
+        client_sockets.remove(current_socket)
+        current_socket.close()
+
 
 
 def main():
@@ -143,9 +230,7 @@ def main():
 
                     if not ok:
                         if "closed" in params:
-                            print(f", {params["closed"]}")
-                            client_sockets.remove(current_socket)
-                            current_socket.close()
+                            closed(current_socket, params)
                         else:
                             print(f", {params["error"]}")
                         continue

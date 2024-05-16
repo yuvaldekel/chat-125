@@ -1,0 +1,7 @@
+200 ok
+400 name already exist
+401 kicked out
+402 muted 
+403 no previlege
+404 members does not exist
+405 already done

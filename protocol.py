@@ -5,23 +5,34 @@ LENGTH_FIELD_SIZE = 2
 SERVER_FIELD_SIZE = 2
 STATUS_SIZE = 3
 
-def create_client_msg(data, name, command):
-    naem_length = str(len(name))
-    zfill_nzme_length = naem_length.zfill(NAME_LENGTH_FIELD_SIZE)
+def create_client_msg(data, name, command, receiver):
+    
+    name_length = str(len(name))
+    zfill_name_length = name_length.zfill(NAME_LENGTH_FIELD_SIZE)
     
     length = str(len(data))
     zfill_length = length.zfill(LENGTH_FIELD_SIZE)
-    
-    message = f"{zfill_nzme_length}{name}{command}{zfill_length}{data}"
+
+    if command == 5:
+        receiver_len = str(len(receiver))
+        zfill_receiver_len = receiver_len.zfill(NAME_LENGTH_FIELD_SIZE)
+        message = f"{zfill_name_length}{name}{command}{zfill_receiver_len}{receiver}{zfill_length}{data}"
+        return message.encode()
+        
+    message = f"{zfill_name_length}{name}{command}{zfill_length}{data}"
+
     return message.encode()
 
 def get_client_msg(my_socket):
     msg_values = {}
     try:
-        
+        time = datetime.datetime.now()
+        msg_values["time"] = f"{time:%H:%M}"
+
         name_length = my_socket.recv(NAME_LENGTH_FIELD_SIZE).decode()
         if name_length == '':
-            return False, {'closed': "client disconnected for some reasons"}
+            msg_values['closed'] = "disconnected for some reasons"
+            return False, msg_values
         name_length = int(name_length)
         
         name = my_socket.recv(name_length).decode()
@@ -30,6 +41,15 @@ def get_client_msg(my_socket):
         command = int(my_socket.recv(1).decode())
         msg_values["command"] = command
 
+        if command == 5:
+            receiver_length = my_socket.recv(NAME_LENGTH_FIELD_SIZE).decode()
+            if receiver_length == '':
+                return False, {'error': "Error receiving massage."}        
+            receiver_length = int(receiver_length)
+
+            receiver = my_socket.recv(receiver_length).decode()
+            msg_values["receiver"] = receiver
+
         data_length = my_socket.recv(LENGTH_FIELD_SIZE).decode()
         if data_length == '':
             return False, {'error': "Error receiving massage."}
@@ -37,9 +57,6 @@ def get_client_msg(my_socket):
 
         data = my_socket.recv(data_length).decode()
         msg_values["data"] = data
-
-        time = datetime.datetime.now()
-        msg_values["time"] = f"{time:%H:%M}"
 
         return True, msg_values
     except ValueError:
@@ -72,6 +89,7 @@ def create_server_msg(message_params,style, status = 200):
     message_len_fill = message_len.zfill(SERVER_FIELD_SIZE)
 
     full_message = str(status) + message_len_fill + message
+
     return full_message.encode()
 
 def main():
